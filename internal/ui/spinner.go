@@ -14,6 +14,7 @@ type Spinner struct {
 	out     io.Writer
 	noColor bool
 	done    chan struct{}
+	exited  chan struct{}
 	mu      sync.Mutex
 	msg     string
 }
@@ -25,12 +26,16 @@ func NewSpinner(out io.Writer, noColor bool) *Spinner {
 
 // Start begins the spinner animation with the given message.
 func (s *Spinner) Start(msg string) {
+	done := make(chan struct{})
+	exited := make(chan struct{})
+
 	s.mu.Lock()
 	s.msg = msg
-	s.done = make(chan struct{})
+	s.done = done
+	s.exited = exited
 	s.mu.Unlock()
 
-	go s.tick()
+	go s.tick(done, exited)
 }
 
 // Update changes the spinner message while it's running.
@@ -47,7 +52,9 @@ func (s *Spinner) Stop(msg string) {
 	if s.noColor {
 		prefix = "* done:"
 	}
+	s.mu.Lock()
 	_, _ = fmt.Fprintf(s.out, "\r\033[K%s %s\n", prefix, msg)
+	s.mu.Unlock()
 }
 
 // Warn halts the spinner and prints a warning line.
@@ -57,36 +64,42 @@ func (s *Spinner) Warn(msg string) {
 	if s.noColor {
 		prefix = "* warn:"
 	}
+	s.mu.Lock()
 	_, _ = fmt.Fprintf(s.out, "\r\033[K%s %s\n", prefix, msg)
+	s.mu.Unlock()
 }
 
 func (s *Spinner) stop() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.done != nil {
-		close(s.done)
-		s.done = nil
+	done := s.done
+	exited := s.exited
+	s.done = nil
+	s.exited = nil
+	s.mu.Unlock()
+
+	if done != nil {
+		close(done)
+	}
+	if exited != nil {
+		<-exited
 	}
 }
 
-func (s *Spinner) tick() {
+func (s *Spinner) tick(done <-chan struct{}, exited chan<- struct{}) {
 	ticker := time.NewTicker(80 * time.Millisecond)
 	defer ticker.Stop()
+	defer close(exited)
 
-	i := 0
-	for {
+	for i := 0; ; i++ {
 		s.mu.Lock()
-		done := s.done
 		msg := s.msg
-		s.mu.Unlock()
-
 		frame := string(frames[i%len(frames)])
 		if s.noColor {
 			frame = "*"
 		}
 		_, _ = fmt.Fprintf(s.out, "\r\033[K%s %s", frame, msg)
+		s.mu.Unlock()
 
-		i++
 		select {
 		case <-done:
 			return
