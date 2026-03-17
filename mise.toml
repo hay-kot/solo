@@ -46,3 +46,8 @@ run = [
     { task = "lint" },
     { task = "test" },
 ]
+
+[tasks.integration]
+description = "Run integration tests in Docker"
+depends = ["build"]
+run = "docker build -f Dockerfile.test -t solo-integration-test . && docker run --rm solo-integration-test"
