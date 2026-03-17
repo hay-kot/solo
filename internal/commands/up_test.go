@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"io"
 	"os"
 	"testing"
 
@@ -110,6 +111,7 @@ func TestUpCmd(t *testing.T) {
 
 			flags := &Flags{Config: tt.cfg}
 			cmd := NewUpCmd(flags, tt.client)
+			cmd.out = io.Discard
 
 			err := cmd.run(context.Background(), nil)
 			if tt.wantErr != "" {

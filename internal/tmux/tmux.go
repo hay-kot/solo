@@ -106,9 +106,9 @@ func (c *ExecClient) SelectWindow(ctx context.Context, target string) error {
 	return nil
 }
 
-// CurrentWindow returns the name of the currently active tmux window.
+// CurrentWindow returns the ID of the currently active tmux window.
 func (c *ExecClient) CurrentWindow(ctx context.Context) (string, error) {
-	cmd := exec.CommandContext(ctx, c.bin, "display-message", "-p", "#{window_name}")
+	cmd := exec.CommandContext(ctx, c.bin, "display-message", "-p", "#{window_id}")
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("display-message: %w", err)

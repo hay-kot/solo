@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
-	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v3"
 
 	"github.com/hay-kot/solo/internal/config"
 	"github.com/hay-kot/solo/internal/tmux"
+	"github.com/hay-kot/solo/internal/ui"
 )
 
 const defaultDownTimeout = 10 * time.Second
@@ -20,11 +21,12 @@ const defaultDownTimeout = 10 * time.Second
 type DownCmd struct {
 	flags  *Flags
 	client tmux.Client
+	out    io.Writer
 }
 
 // NewDownCmd creates a new down command.
 func NewDownCmd(flags *Flags, client tmux.Client) *DownCmd {
-	return &DownCmd{flags: flags, client: client}
+	return &DownCmd{flags: flags, client: client, out: os.Stderr}
 }
 
 // Register adds the down command to the application.
@@ -54,8 +56,6 @@ func (cmd *DownCmd) run(ctx context.Context, _ *cli.Command) error {
 		return fmt.Errorf("resolving project: %w", err)
 	}
 
-	log.Debug().Str("source", result.Source).Msg("resolved project config")
-
 	timeout := defaultDownTimeout
 	if result.Project.Timeout > 0 {
 		timeout = time.Duration(result.Project.Timeout) * time.Second
@@ -71,20 +71,24 @@ func (cmd *DownCmd) run(ctx context.Context, _ *cli.Command) error {
 		windowsByName[w.Name] = w
 	}
 
+	spin := ui.NewSpinner(cmd.out, cmd.flags.NoColor)
 	var killed int
 
-	for _, tab := range result.Project.Tabs {
+	for i := len(result.Project.Tabs) - 1; i >= 0; i-- {
+		tab := result.Project.Tabs[i]
 		win, found := windowsByName[tab.Title]
 		if !found {
-			log.Warn().Str("window", tab.Title).Msg("window not found, skipping")
+			spin.Warn(fmt.Sprintf("Window %s not found, skipping", tab.Title))
 			continue
 		}
+
+		spin.Start(fmt.Sprintf("Sending interrupt to %s...", tab.Title))
 
 		// Send C-c to interrupt any running process; ignore errors since the
 		// process may have already exited.
 		_ = cmd.client.SendKeys(ctx, win.ID, "C-c")
 
-		cmd.waitForExit(ctx, win.ID, timeout)
+		cmd.waitForExit(ctx, spin, win.ID, tab.Title, timeout)
 
 		if err := cmd.client.KillWindow(ctx, win.ID); err != nil {
 			return fmt.Errorf("killing window %q: %w", tab.Title, err)
@@ -93,14 +97,14 @@ func (cmd *DownCmd) run(ctx context.Context, _ *cli.Command) error {
 		killed++
 	}
 
-	log.Info().Int("killed", killed).Int("total", len(result.Project.Tabs)).Msg("windows torn down")
+	_, _ = fmt.Fprintf(cmd.out, "Torn down %d/%d windows\n", killed, len(result.Project.Tabs))
 
 	return nil
 }
 
 // waitForExit polls the pane command until it returns to a shell or the timeout
 // expires. Polling happens at 500ms intervals.
-func (cmd *DownCmd) waitForExit(ctx context.Context, target string, timeout time.Duration) {
+func (cmd *DownCmd) waitForExit(ctx context.Context, spin *ui.Spinner, target, name string, timeout time.Duration) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -110,18 +114,21 @@ func (cmd *DownCmd) waitForExit(ctx context.Context, target string, timeout time
 	for {
 		select {
 		case <-ctx.Done():
-			log.Warn().Str("target", target).Msg("timeout waiting for process to exit")
+			spin.Warn(fmt.Sprintf("%s timed out, killed", name))
 			return
 		case <-ticker.C:
 			paneCmd, err := cmd.client.ListPaneCommand(ctx, target)
 			if err != nil {
-				log.Warn().Err(err).Str("target", target).Msg("error checking pane command")
+				spin.Warn(fmt.Sprintf("%s error checking pane", name))
 				return
 			}
 
 			if paneCmd == "" || tmux.IsShell(paneCmd) {
+				spin.Stop(fmt.Sprintf("%s stopped", name))
 				return
 			}
+
+			spin.Update(fmt.Sprintf("Waiting for %s to exit...", name))
 		}
 	}
 }

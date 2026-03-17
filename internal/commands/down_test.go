@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"io"
 	"os"
 	"sync/atomic"
 	"testing"
@@ -64,10 +65,10 @@ func TestDownCmd(t *testing.T) {
 				},
 			},
 			wantKeys: []sendKeysCall{
-				{Target: "@1", Keys: []string{"C-c"}},
 				{Target: "@2", Keys: []string{"C-c"}},
+				{Target: "@1", Keys: []string{"C-c"}},
 			},
-			wantKilled: []string{"@1", "@2"},
+			wantKilled: []string{"@2", "@1"},
 		},
 		{
 			name: "skips non-matching windows",
@@ -153,6 +154,7 @@ func TestDownCmd(t *testing.T) {
 
 			flags := &Flags{Config: tt.cfg}
 			cmd := NewDownCmd(flags, tt.client)
+			cmd.out = io.Discard
 
 			err := cmd.run(context.Background(), nil)
 			if tt.wantErr != "" {
@@ -205,6 +207,7 @@ func TestDownCmd_Timeout(t *testing.T) {
 
 	flags := &Flags{Config: cfg}
 	cmd := NewDownCmd(flags, client)
+	cmd.out = io.Discard
 
 	err = cmd.run(context.Background(), nil)
 	require.NoError(t, err)
@@ -249,6 +252,7 @@ func TestDownCmd_ProcessExitsAfterPolling(t *testing.T) {
 
 	flags := &Flags{Config: cfg}
 	cmd := NewDownCmd(flags, client)
+	cmd.out = io.Discard
 
 	err = cmd.run(context.Background(), nil)
 	require.NoError(t, err)

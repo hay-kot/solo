@@ -4,24 +4,26 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 
-	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v3"
 
 	"github.com/hay-kot/solo/internal/config"
 	"github.com/hay-kot/solo/internal/tmux"
+	"github.com/hay-kot/solo/internal/ui"
 )
 
 // UpCmd implements the up command.
 type UpCmd struct {
 	flags  *Flags
 	client tmux.Client
+	out    io.Writer
 }
 
 // NewUpCmd creates a new up command.
 func NewUpCmd(flags *Flags, client tmux.Client) *UpCmd {
-	return &UpCmd{flags: flags, client: client}
+	return &UpCmd{flags: flags, client: client, out: os.Stderr}
 }
 
 // Register adds the up command to the application.
@@ -51,8 +53,6 @@ func (cmd *UpCmd) run(ctx context.Context, _ *cli.Command) error {
 		return fmt.Errorf("resolving project: %w", err)
 	}
 
-	log.Debug().Str("source", result.Source).Msg("resolved project config")
-
 	originalWindow, err := cmd.client.CurrentWindow(ctx)
 	if err != nil {
 		return fmt.Errorf("getting current window: %w", err)
@@ -68,25 +68,31 @@ func (cmd *UpCmd) run(ctx context.Context, _ *cli.Command) error {
 		existingNames[w.Name] = struct{}{}
 	}
 
+	spin := ui.NewSpinner(cmd.out, cmd.flags.NoColor)
 	var created int
 
 	for _, tab := range result.Project.Tabs {
 		if _, exists := existingNames[tab.Title]; exists {
-			log.Warn().Str("window", tab.Title).Msg("window already exists, skipping")
+			spin.Warn(fmt.Sprintf("Window %s already exists, skipping", tab.Title))
 			continue
 		}
 
+		spin.Start(fmt.Sprintf("Creating window %s...", tab.Title))
+
 		winID, err := cmd.client.NewWindow(ctx, tab.Title)
 		if err != nil {
+			spin.Stop(tab.Title)
 			return fmt.Errorf("creating window %q: %w", tab.Title, err)
 		}
 
 		if tab.Cmd != "" {
 			if err := cmd.client.SendKeys(ctx, winID, tab.Cmd, "Enter"); err != nil {
+				spin.Stop(tab.Title)
 				return fmt.Errorf("sending keys to %q: %w", tab.Title, err)
 			}
 		}
 
+		spin.Stop(fmt.Sprintf("Created %s", tab.Title))
 		created++
 	}
 
@@ -94,7 +100,7 @@ func (cmd *UpCmd) run(ctx context.Context, _ *cli.Command) error {
 		return fmt.Errorf("selecting original window: %w", err)
 	}
 
-	log.Info().Int("created", created).Int("total", len(result.Project.Tabs)).Msg("windows created")
+	_, _ = fmt.Fprintf(cmd.out, "Created %d/%d windows\n", created, len(result.Project.Tabs))
 
 	return nil
 }
