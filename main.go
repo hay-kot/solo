@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime/debug"
 	"syscall"
-	"io"
-	"path/filepath"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -17,6 +17,7 @@ import (
 	"github.com/hay-kot/solo/internal/commands"
 	"github.com/hay-kot/solo/internal/config"
 	"github.com/hay-kot/solo/internal/paths"
+	"github.com/hay-kot/solo/internal/tmux"
 )
 
 var (
@@ -48,6 +49,7 @@ func build() string {
 
 	return fmt.Sprintf("%s (%s) %s", version, short, date)
 }
+
 func setupLogger(level string, logFile string, noColor bool) error {
 	parsedLevel, err := zerolog.ParseLevel(level)
 	if err != nil {
@@ -59,12 +61,12 @@ func setupLogger(level string, logFile string, noColor bool) error {
 	if logFile != "" {
 		// Create log directory if it doesn't exist
 		logDir := filepath.Dir(logFile)
-		if err := os.MkdirAll(logDir, 0755); err != nil {
+		if err := os.MkdirAll(logDir, 0o755); err != nil {
 			return fmt.Errorf("failed to create log directory: %w", err)
 		}
 
 		// Open log file
-		file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 		if err != nil {
 			return fmt.Errorf("failed to open log file: %w", err)
 		}
@@ -133,6 +135,8 @@ func run() int {
 				return ctx, fmt.Errorf("loading config: %w", err)
 			}
 
+			flags.Config = cfg
+
 			if flags.LogLevel == "info" && cfg.LogLevel != "" {
 				flags.LogLevel = cfg.LogLevel
 			}
@@ -151,7 +155,7 @@ func run() int {
 			return ctx, nil
 		},
 	}
-	app = commands.NewUpCmd(flags).Register(app)
+	app = commands.NewUpCmd(flags, tmux.NewExecClient("")).Register(app)
 	app = commands.NewDownCmd(flags).Register(app)
 	app = commands.NewExecCmd(flags).Register(app)
 	app = commands.NewConfigCmd(flags).Register(app)
