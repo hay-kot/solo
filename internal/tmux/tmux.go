@@ -17,7 +17,7 @@ type Window struct {
 // Client defines the interface for interacting with tmux.
 type Client interface {
 	InTmux() bool
-	NewWindow(ctx context.Context, name string) error
+	NewWindow(ctx context.Context, name string) (string, error)
 	SendKeys(ctx context.Context, target string, keys ...string) error
 	ListWindows(ctx context.Context) ([]Window, error)
 	ListPaneCommand(ctx context.Context, target string) (string, error)
@@ -45,13 +45,14 @@ func (c *ExecClient) InTmux() bool {
 	return os.Getenv("TMUX") != ""
 }
 
-// NewWindow creates a new tmux window with the given name.
-func (c *ExecClient) NewWindow(ctx context.Context, name string) error {
-	cmd := exec.CommandContext(ctx, c.bin, "new-window", "-n", name)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("new-window %q: %s: %w", name, strings.TrimSpace(string(out)), err)
+// NewWindow creates a new tmux window with the given name and returns its ID.
+func (c *ExecClient) NewWindow(ctx context.Context, name string) (string, error) {
+	cmd := exec.CommandContext(ctx, c.bin, "new-window", "-n", name, "-P", "-F", "#{window_id}")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("new-window %q: %s: %w", name, strings.TrimSpace(string(out)), err)
 	}
-	return nil
+	return strings.TrimSpace(string(out)), nil
 }
 
 // SendKeys sends keystrokes to the target tmux window/pane. Each key is passed

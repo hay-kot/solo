@@ -76,12 +76,13 @@ func (cmd *UpCmd) run(ctx context.Context, _ *cli.Command) error {
 			continue
 		}
 
-		if err := cmd.client.NewWindow(ctx, tab.Title); err != nil {
+		winID, err := cmd.client.NewWindow(ctx, tab.Title)
+		if err != nil {
 			return fmt.Errorf("creating window %q: %w", tab.Title, err)
 		}
 
 		if tab.Cmd != "" {
-			if err := cmd.client.SendKeys(ctx, tab.Title, tab.Cmd, "Enter"); err != nil {
+			if err := cmd.client.SendKeys(ctx, winID, tab.Cmd, "Enter"); err != nil {
 				return fmt.Errorf("sending keys to %q: %w", tab.Title, err)
 			}
 		}

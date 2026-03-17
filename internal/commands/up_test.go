@@ -51,8 +51,8 @@ func TestUpCmd(t *testing.T) {
 			),
 			wantCreated: []string{"server", "logs"},
 			wantSentKeys: []sendKeysCall{
-				{Target: "server", Keys: []string{"go run .", "Enter"}},
-				{Target: "logs", Keys: []string{"tail -f log", "Enter"}},
+				{Target: "@0", Keys: []string{"go run .", "Enter"}},
+				{Target: "@1", Keys: []string{"tail -f log", "Enter"}},
 			},
 			wantSelected: []string{"main"},
 		},
@@ -71,7 +71,7 @@ func TestUpCmd(t *testing.T) {
 			),
 			wantCreated: []string{"logs"},
 			wantSentKeys: []sendKeysCall{
-				{Target: "logs", Keys: []string{"tail -f log", "Enter"}},
+				{Target: "@0", Keys: []string{"tail -f log", "Enter"}},
 			},
 			wantSelected: []string{"main"},
 		},
@@ -86,7 +86,7 @@ func TestUpCmd(t *testing.T) {
 			),
 			wantCreated: []string{"build"},
 			wantSentKeys: []sendKeysCall{
-				{Target: "build", Keys: []string{"make", "Enter"}},
+				{Target: "@0", Keys: []string{"make", "Enter"}},
 			},
 			wantSelected: []string{"editor"},
 		},

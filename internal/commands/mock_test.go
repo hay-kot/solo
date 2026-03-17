@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hay-kot/solo/internal/tmux"
 )
@@ -19,6 +20,7 @@ type mockClient struct {
 	sentKeys     []sendKeysCall
 	selectedWins []string
 	killedWins   []string
+	nextWindowID int // auto-increments to generate window IDs
 
 	// listPaneCommandFn allows tests to control ListPaneCommand behavior.
 	// When nil, returns ("", nil).
@@ -35,9 +37,11 @@ func (m *mockClient) ListWindows(_ context.Context) ([]tmux.Window, error) {
 	return m.windows, nil
 }
 
-func (m *mockClient) NewWindow(_ context.Context, name string) error {
+func (m *mockClient) NewWindow(_ context.Context, name string) (string, error) {
 	m.createdWins = append(m.createdWins, name)
-	return nil
+	id := fmt.Sprintf("@%d", m.nextWindowID)
+	m.nextWindowID++
+	return id, nil
 }
 
 func (m *mockClient) SendKeys(_ context.Context, target string, keys ...string) error {
