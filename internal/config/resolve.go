@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -12,7 +11,7 @@ import (
 // ResolveResult holds the resolved project configuration and its source.
 type ResolveResult struct {
 	Project Project
-	Source  string // "local", "global-exact", "global-prefix"
+	Source  string // "local", "global-exact", "global-basename", "global-glob"
 }
 
 // ResolveProject resolves project configuration for the given directory.
@@ -20,8 +19,9 @@ type ResolveResult struct {
 // Resolution order:
 //  1. .solo.yml in dir (source: "local")
 //  2. .solo.yaml in dir (source: "local")
-//  3. Exact match in cfg.Projects (source: "global-exact")
-//  4. Longest prefix match in cfg.Projects (source: "global-prefix")
+//  3. Exact match in cfg.Projects on full path (source: "global-exact")
+//  4. Exact match in cfg.Projects on basename (source: "global-basename")
+//  5. Glob match in cfg.Projects on basename, longest pattern wins (source: "global-glob")
 func ResolveProject(dir string, cfg Config) (ResolveResult, error) {
 	// Try local files first.
 	for _, name := range []string{".solo.yml", ".solo.yaml"} {
@@ -35,7 +35,7 @@ func ResolveProject(dir string, cfg Config) (ResolveResult, error) {
 		}
 	}
 
-	// Try global exact match.
+	// Try global exact match on full path.
 	if proj, ok := cfg.Projects[dir]; ok {
 		return ResolveResult{
 			Project: proj,
@@ -43,30 +43,35 @@ func ResolveProject(dir string, cfg Config) (ResolveResult, error) {
 		}, nil
 	}
 
-	// Try longest prefix match.
+	basename := filepath.Base(dir)
+
+	// Try global exact match on basename.
+	if proj, ok := cfg.Projects[basename]; ok {
+		return ResolveResult{
+			Project: proj,
+			Source:  "global-basename",
+		}, nil
+	}
+
+	// Try glob match on basename, longest pattern wins.
 	var bestKey string
 
 	for key := range cfg.Projects {
-		expanded := expandHome(key)
-		if !strings.HasPrefix(dir, expanded) {
+		matched, err := filepath.Match(key, basename)
+		if err != nil {
 			continue
 		}
 
-		if len(expanded) > len(bestKey) {
-			bestKey = expanded
+		if matched && len(key) > len(bestKey) {
+			bestKey = key
 		}
 	}
 
 	if bestKey != "" {
-		// Find the original key that produced this expanded path.
-		for key := range cfg.Projects {
-			if expandHome(key) == bestKey {
-				return ResolveResult{
-					Project: cfg.Projects[key],
-					Source:  "global-prefix",
-				}, nil
-			}
-		}
+		return ResolveResult{
+			Project: cfg.Projects[bestKey],
+			Source:  "global-glob",
+		}, nil
 	}
 
 	return ResolveResult{}, fmt.Errorf("no project configuration found for %s", dir)
@@ -91,17 +96,4 @@ func tryLocalFile(path string) (ResolveResult, bool, error) {
 		Project: proj,
 		Source:  "local",
 	}, true, nil
-}
-
-func expandHome(path string) string {
-	if !strings.HasPrefix(path, "~/") {
-		return path
-	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return path
-	}
-
-	return filepath.Join(home, path[2:])
 }

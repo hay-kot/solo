@@ -119,7 +119,7 @@ func (cmd *DownCmd) waitForExit(ctx context.Context, target string, timeout time
 				return
 			}
 
-			if tmux.IsShell(paneCmd) {
+			if paneCmd == "" || tmux.IsShell(paneCmd) {
 				return
 			}
 		}

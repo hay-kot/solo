@@ -96,6 +96,31 @@ func TestDownCmd(t *testing.T) {
 			wantKilled: []string{"@1"},
 		},
 		{
+			name: "handles empty pane command as exited",
+			client: &mockClient{
+				inTmux: true,
+				windows: []tmux.Window{
+					{Name: "worker", ID: "@4"},
+				},
+				listPaneCommandFn: func(_ string) (string, error) {
+					return "", nil
+				},
+			},
+			cfg: config.Config{
+				Projects: map[string]config.Project{
+					cwd: {
+						Tabs: []config.Tab{
+							{Title: "worker", Cmd: "python worker.py"},
+						},
+					},
+				},
+			},
+			wantKeys: []sendKeysCall{
+				{Target: "@4", Keys: []string{"C-c"}},
+			},
+			wantKilled: []string{"@4"},
+		},
+		{
 			name: "handles immediate shell exit",
 			client: &mockClient{
 				inTmux: true,

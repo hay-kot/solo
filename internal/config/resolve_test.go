@@ -98,43 +98,65 @@ tabs:
 			wantTabs:   2,
 		},
 		{
-			name: "global prefix match",
+			name: "basename exact match",
 			setupDir: func(t *testing.T) string {
 				t.Helper()
 				dir := t.TempDir()
-				sub := filepath.Join(dir, "subdir")
+				sub := filepath.Join(dir, "recipinned")
 				require.NoError(t, os.MkdirAll(sub, 0o755))
 				return sub
 			},
 			cfg: Config{
 				Projects: map[string]Project{
-					"PLACEHOLDER_PARENT": {
+					"recipinned": {
 						Tabs: []Tab{
-							{Title: "shell", Cmd: ""},
+							{Title: "dev", Cmd: "make dev"},
 						},
 					},
 				},
 			},
-			wantSource: "global-prefix",
+			wantSource: "global-basename",
 			wantTabs:   1,
 		},
 		{
-			name: "longest prefix wins",
+			name: "basename glob match",
 			setupDir: func(t *testing.T) string {
 				t.Helper()
 				dir := t.TempDir()
-				sub := filepath.Join(dir, "code", "myproject")
+				sub := filepath.Join(dir, "recipinned-v2")
 				require.NoError(t, os.MkdirAll(sub, 0o755))
 				return sub
 			},
 			cfg: Config{
 				Projects: map[string]Project{
-					"PLACEHOLDER_SHORT": {
+					"recipinned*": {
+						Tabs: []Tab{
+							{Title: "dev", Cmd: "make dev"},
+							{Title: "logs", Cmd: "tail -f log"},
+						},
+					},
+				},
+			},
+			wantSource: "global-glob",
+			wantTabs:   2,
+		},
+		{
+			name: "longest glob wins",
+			setupDir: func(t *testing.T) string {
+				t.Helper()
+				dir := t.TempDir()
+				sub := filepath.Join(dir, "recipinned-v2")
+				require.NoError(t, os.MkdirAll(sub, 0o755))
+				return sub
+			},
+			cfg: Config{
+				Projects: map[string]Project{
+					"rec*": {
 						Tabs: []Tab{
 							{Title: "short", Cmd: "echo short"},
 						},
 					},
-					"PLACEHOLDER_LONG": {
+					"recipinned*": {
 						Tabs: []Tab{
 							{Title: "long", Cmd: "echo long"},
 							{Title: "long2", Cmd: "echo long2"},
@@ -142,8 +164,103 @@ tabs:
 					},
 				},
 			},
-			wantSource: "global-prefix",
-			wantTabs:   2, // longest prefix match
+			wantSource: "global-glob",
+			wantTabs:   2, // longest pattern "recipinned*" wins
+		},
+		{
+			name: "glob with question mark",
+			setupDir: func(t *testing.T) string {
+				t.Helper()
+				dir := t.TempDir()
+				sub := filepath.Join(dir, "app1")
+				require.NoError(t, os.MkdirAll(sub, 0o755))
+				return sub
+			},
+			cfg: Config{
+				Projects: map[string]Project{
+					"app?": {
+						Tabs: []Tab{
+							{Title: "dev", Cmd: "make dev"},
+						},
+					},
+				},
+			},
+			wantSource: "global-glob",
+			wantTabs:   1,
+		},
+		{
+			name: "glob question mark does not match long suffix",
+			setupDir: func(t *testing.T) string {
+				t.Helper()
+				dir := t.TempDir()
+				sub := filepath.Join(dir, "application")
+				require.NoError(t, os.MkdirAll(sub, 0o755))
+				return sub
+			},
+			cfg: Config{
+				Projects: map[string]Project{
+					"app?": {
+						Tabs: []Tab{
+							{Title: "dev", Cmd: "make dev"},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "full path exact takes precedence over basename",
+			setupDir: func(t *testing.T) string {
+				t.Helper()
+				dir := t.TempDir()
+				sub := filepath.Join(dir, "myproject")
+				require.NoError(t, os.MkdirAll(sub, 0o755))
+				return sub
+			},
+			cfg: Config{
+				Projects: map[string]Project{
+					"PLACEHOLDER": {
+						Tabs: []Tab{
+							{Title: "exact", Cmd: "echo exact"},
+							{Title: "exact2", Cmd: "echo exact2"},
+						},
+					},
+					"myproject": {
+						Tabs: []Tab{
+							{Title: "basename", Cmd: "echo basename"},
+						},
+					},
+				},
+			},
+			wantSource: "global-exact",
+			wantTabs:   2,
+		},
+		{
+			name: "local takes precedence over basename",
+			setupDir: func(t *testing.T) string {
+				t.Helper()
+				dir := t.TempDir()
+				sub := filepath.Join(dir, "myproject")
+				require.NoError(t, os.MkdirAll(sub, 0o755))
+				writeFile(t, filepath.Join(sub, ".solo.yml"), `
+tabs:
+  - title: local
+    cmd: echo local
+`)
+				return sub
+			},
+			cfg: Config{
+				Projects: map[string]Project{
+					"myproject": {
+						Tabs: []Tab{
+							{Title: "basename", Cmd: "echo basename"},
+							{Title: "basename2", Cmd: "echo basename2"},
+						},
+					},
+				},
+			},
+			wantSource: "local",
+			wantTabs:   1,
 		},
 		{
 			name: "no match returns error",
@@ -221,12 +338,6 @@ tabs:
 					switch key {
 					case "PLACEHOLDER":
 						resolved[dir] = proj
-					case "PLACEHOLDER_PARENT":
-						resolved[filepath.Dir(dir)] = proj
-					case "PLACEHOLDER_SHORT":
-						resolved[filepath.Dir(filepath.Dir(dir))] = proj
-					case "PLACEHOLDER_LONG":
-						resolved[filepath.Dir(dir)] = proj
 					default:
 						resolved[key] = proj
 					}

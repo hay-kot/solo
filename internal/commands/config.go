@@ -67,8 +67,10 @@ func formatSource(source string) string {
 		return "local"
 	case "global-exact":
 		return "global (exact match)"
-	case "global-prefix":
-		return "global (prefix match)"
+	case "global-basename":
+		return "global (basename match)"
+	case "global-glob":
+		return "global (glob match)"
 	default:
 		return source
 	}

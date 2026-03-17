@@ -104,7 +104,8 @@ func TestFormatSource(t *testing.T) {
 	}{
 		{name: "local", source: "local", want: "local"},
 		{name: "global exact", source: "global-exact", want: "global (exact match)"},
-		{name: "global prefix", source: "global-prefix", want: "global (prefix match)"},
+		{name: "global basename", source: "global-basename", want: "global (basename match)"},
+		{name: "global glob", source: "global-glob", want: "global (glob match)"},
 		{name: "unknown", source: "custom", want: "custom"},
 	}
 
