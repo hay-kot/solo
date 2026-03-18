@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime/debug"
 	"syscall"
-	"io"
-	"path/filepath"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -17,6 +17,7 @@ import (
 	"github.com/hay-kot/solo/internal/commands"
 	"github.com/hay-kot/solo/internal/config"
 	"github.com/hay-kot/solo/internal/paths"
+	"github.com/hay-kot/solo/internal/tmux"
 )
 
 var (
@@ -48,6 +49,16 @@ func build() string {
 
 	return fmt.Sprintf("%s (%s) %s", version, short, date)
 }
+
+// soloEnv returns a cli.EnvVars source with the SOLO_ prefix and any
+// additional unprefixed aliases (e.g. NO_COLOR).
+func soloEnv(name string, aliases ...string) cli.ValueSourceChain {
+	vars := make([]string, 0, 1+len(aliases))
+	vars = append(vars, "SOLO_"+name)
+	vars = append(vars, aliases...)
+	return cli.EnvVars(vars...)
+}
+
 func setupLogger(level string, logFile string, noColor bool) error {
 	parsedLevel, err := zerolog.ParseLevel(level)
 	if err != nil {
@@ -59,12 +70,12 @@ func setupLogger(level string, logFile string, noColor bool) error {
 	if logFile != "" {
 		// Create log directory if it doesn't exist
 		logDir := filepath.Dir(logFile)
-		if err := os.MkdirAll(logDir, 0755); err != nil {
+		if err := os.MkdirAll(logDir, 0o755); err != nil {
 			return fmt.Errorf("failed to create log directory: %w", err)
 		}
 
 		// Open log file
-		file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 		if err != nil {
 			return fmt.Errorf("failed to open log file: %w", err)
 		}
@@ -72,7 +83,7 @@ func setupLogger(level string, logFile string, noColor bool) error {
 		// Write to both console and file
 		output = io.MultiWriter(
 			zerolog.ConsoleWriter{Out: os.Stderr, NoColor: noColor},
-			file,
+			zerolog.ConsoleWriter{Out: file, NoColor: true},
 		)
 	}
 
@@ -99,26 +110,26 @@ func run() int {
 			&cli.StringFlag{
 				Name:        "log-level",
 				Usage:       "log level (debug, info, warn, error, fatal, panic)",
-				Sources:     cli.EnvVars("LOG_LEVEL"),
+				Sources:     soloEnv("LOG_LEVEL"),
 				Value:       "info",
 				Destination: &flags.LogLevel,
 			},
 			&cli.BoolFlag{
 				Name:        "no-color",
 				Usage:       "disable colored output",
-				Sources:     cli.EnvVars("NO_COLOR"),
+				Sources:     soloEnv("NO_COLOR", "NO_COLOR"),
 				Destination: &flags.NoColor,
 			},
 			&cli.StringFlag{
 				Name:        "log-file",
 				Usage:       "path to log file (optional)",
-				Sources:     cli.EnvVars("LOG_FILE"),
+				Sources:     soloEnv("LOG_FILE"),
 				Destination: &flags.LogFile,
 			},
 			&cli.StringFlag{
 				Name:        "config",
 				Usage:       "path to config file",
-				Sources:     cli.EnvVars("CONFIG_FILE"),
+				Sources:     soloEnv("CONFIG_FILE"),
 				Destination: &flags.ConfigFile,
 			},
 		},
@@ -132,6 +143,8 @@ func run() int {
 			if err != nil {
 				return ctx, fmt.Errorf("loading config: %w", err)
 			}
+
+			flags.Config = cfg
 
 			if flags.LogLevel == "info" && cfg.LogLevel != "" {
 				flags.LogLevel = cfg.LogLevel
@@ -151,9 +164,8 @@ func run() int {
 			return ctx, nil
 		},
 	}
-	app = commands.NewUpCmd(flags).Register(app)
-	app = commands.NewDownCmd(flags).Register(app)
-	app = commands.NewExecCmd(flags).Register(app)
+	app = commands.NewUpCmd(flags, tmux.NewExecClient("")).Register(app)
+	app = commands.NewDownCmd(flags, tmux.NewExecClient("")).Register(app)
 	app = commands.NewConfigCmd(flags).Register(app)
 	app = commands.NewDoctorCmd(flags).Register(app)
 	// +scaffold:command:register

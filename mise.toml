@@ -5,7 +5,7 @@ goreleaser = "latest"
 "github:gotestyourself/gotestsum" = "latest"
 
 [env]
-LOG_LEVEL = "debug"
+SOLO_LOG_LEVEL = "debug"
 
 [tasks.run]
 description = "Run the main application"
@@ -46,3 +46,8 @@ run = [
     { task = "lint" },
     { task = "test" },
 ]
+
+[tasks.integration]
+description = "Run integration tests in Docker"
+depends = ["build"]
+run = "docker build -f Dockerfile.test -t solo-integration-test . && docker run --rm solo-integration-test"

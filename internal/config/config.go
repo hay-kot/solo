@@ -10,10 +10,24 @@ import (
 	"github.com/hay-kot/solo/internal/paths"
 )
 
+// Tab represents a terminal tab configuration with a title and command.
+type Tab struct {
+	Title string `yaml:"title"`
+	Cmd   string `yaml:"cmd"`
+}
+
+// Project defines a project configuration with tabs and a shutdown timeout.
+type Project struct {
+	Dir     string `yaml:"dir"`
+	Tabs    []Tab  `yaml:"tabs"`
+	Timeout int    `yaml:"timeout"` // seconds for down command, default 10
+}
+
 // Config holds the application configuration loaded from a YAML file.
 type Config struct {
-	LogLevel string `yaml:"log_level"`
-	LogFile  string `yaml:"log_file"`
+	LogLevel string             `yaml:"log_level"`
+	LogFile  string             `yaml:"log_file"`
+	Projects map[string]Project `yaml:"projects"`
 }
 
 // Default returns a Config with default values.
