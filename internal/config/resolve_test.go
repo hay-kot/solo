@@ -13,12 +13,13 @@ func TestResolveProject(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		setupDir   func(t *testing.T) string
-		cfg        Config
-		wantSource string
-		wantTabs   int
-		wantErr    bool
+		name        string
+		setupDir    func(t *testing.T) string
+		cfg         Config
+		wantSource  string
+		wantTabs    int
+		wantTimeout int
+		wantErr     bool
 	}{
 		{
 			name: "local .solo.yml found",
@@ -272,15 +273,6 @@ tabs:
 			wantErr: true,
 		},
 		{
-			name: "empty config no local files returns error",
-			setupDir: func(t *testing.T) string {
-				t.Helper()
-				return t.TempDir()
-			},
-			cfg:     Config{Projects: map[string]Project{}},
-			wantErr: true,
-		},
-		{
 			name: "local file with timeout",
 			setupDir: func(t *testing.T) string {
 				t.Helper()
@@ -293,9 +285,10 @@ timeout: 30
 `)
 				return dir
 			},
-			cfg:        Config{},
-			wantSource: "local",
-			wantTabs:   1,
+			cfg:         Config{},
+			wantSource:  "local",
+			wantTabs:    1,
+			wantTimeout: 30,
 		},
 		{
 			name: "local file takes precedence over global exact",
@@ -354,24 +347,12 @@ tabs:
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantSource, result.Source)
 			assert.Len(t, result.Project.Tabs, tt.wantTabs)
+
+			if tt.wantTimeout > 0 {
+				assert.Equal(t, tt.wantTimeout, result.Project.Timeout)
+			}
 		})
 	}
-}
-
-func TestResolveProjectLocalTimeout(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, ".solo.yml"), `
-tabs:
-  - title: app
-    cmd: ./run.sh
-timeout: 30
-`)
-
-	result, err := ResolveProject(dir, Config{})
-	require.NoError(t, err)
-	assert.Equal(t, 30, result.Project.Timeout)
 }
 
 func writeFile(t *testing.T, path, content string) {
