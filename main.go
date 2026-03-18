@@ -166,7 +166,6 @@ func run() int {
 	}
 	app = commands.NewUpCmd(flags, tmux.NewExecClient("")).Register(app)
 	app = commands.NewDownCmd(flags, tmux.NewExecClient("")).Register(app)
-	app = commands.NewExecCmd(flags).Register(app)
 	app = commands.NewConfigCmd(flags).Register(app)
 	app = commands.NewDoctorCmd(flags).Register(app)
 	// +scaffold:command:register
