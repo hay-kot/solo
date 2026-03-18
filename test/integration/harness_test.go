@@ -104,7 +104,7 @@ func (h *Harness) command(args ...string) *exec.Cmd {
 		"NO_COLOR=1",
 	}
 	if h.configPath != "" {
-		cmd.Env = append(cmd.Env, "CONFIG_FILE="+h.configPath)
+		cmd.Env = append(cmd.Env, "SOLO_CONFIG_FILE="+h.configPath)
 	}
 	// Propagate tmux socket isolation if set
 	if tmuxDir := os.Getenv("TMUX_TMPDIR"); tmuxDir != "" {

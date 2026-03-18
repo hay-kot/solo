@@ -5,7 +5,7 @@ goreleaser = "latest"
 "github:gotestyourself/gotestsum" = "latest"
 
 [env]
-LOG_LEVEL = "debug"
+SOLO_LOG_LEVEL = "debug"
 
 [tasks.run]
 description = "Run the main application"

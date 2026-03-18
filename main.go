@@ -50,6 +50,15 @@ func build() string {
 	return fmt.Sprintf("%s (%s) %s", version, short, date)
 }
 
+// soloEnv returns a cli.EnvVars source with the SOLO_ prefix and any
+// additional unprefixed aliases (e.g. NO_COLOR).
+func soloEnv(name string, aliases ...string) cli.ValueSourceChain {
+	vars := make([]string, 0, 1+len(aliases))
+	vars = append(vars, "SOLO_"+name)
+	vars = append(vars, aliases...)
+	return cli.EnvVars(vars...)
+}
+
 func setupLogger(level string, logFile string, noColor bool) error {
 	parsedLevel, err := zerolog.ParseLevel(level)
 	if err != nil {
@@ -101,26 +110,26 @@ func run() int {
 			&cli.StringFlag{
 				Name:        "log-level",
 				Usage:       "log level (debug, info, warn, error, fatal, panic)",
-				Sources:     cli.EnvVars("LOG_LEVEL"),
+				Sources:     soloEnv("LOG_LEVEL"),
 				Value:       "info",
 				Destination: &flags.LogLevel,
 			},
 			&cli.BoolFlag{
 				Name:        "no-color",
 				Usage:       "disable colored output",
-				Sources:     cli.EnvVars("NO_COLOR"),
+				Sources:     soloEnv("NO_COLOR", "NO_COLOR"),
 				Destination: &flags.NoColor,
 			},
 			&cli.StringFlag{
 				Name:        "log-file",
 				Usage:       "path to log file (optional)",
-				Sources:     cli.EnvVars("LOG_FILE"),
+				Sources:     soloEnv("LOG_FILE"),
 				Destination: &flags.LogFile,
 			},
 			&cli.StringFlag{
 				Name:        "config",
 				Usage:       "path to config file",
-				Sources:     cli.EnvVars("CONFIG_FILE"),
+				Sources:     soloEnv("CONFIG_FILE"),
 				Destination: &flags.ConfigFile,
 			},
 		},
