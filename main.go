@@ -74,7 +74,7 @@ func setupLogger(level string, logFile string, noColor bool) error {
 		// Write to both console and file
 		output = io.MultiWriter(
 			zerolog.ConsoleWriter{Out: os.Stderr, NoColor: noColor},
-			file,
+			zerolog.ConsoleWriter{Out: file, NoColor: true},
 		)
 	}
 
