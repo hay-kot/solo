@@ -34,7 +34,7 @@ func TestSpinner_Warn(t *testing.T) {
 	s.Warn("something wrong")
 
 	out := buf.String()
-	assert.Contains(t, out, "⚠")
+	assert.Contains(t, out, "~")
 	assert.Contains(t, out, "something wrong")
 }
 

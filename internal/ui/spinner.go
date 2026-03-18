@@ -60,7 +60,7 @@ func (s *Spinner) Stop(msg string) {
 // Warn halts the spinner and prints a warning line.
 func (s *Spinner) Warn(msg string) {
 	s.stop()
-	prefix := "\033[33m⚠\033[0m"
+	prefix := "\033[33m~\033[0m"
 	if s.noColor {
 		prefix = "* warn:"
 	}
