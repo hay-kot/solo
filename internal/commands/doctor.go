@@ -2,7 +2,6 @@ package commands
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/hay-kot/solo/internal/config"
 	"github.com/hay-kot/solo/internal/paths"
+	"github.com/hay-kot/solo/internal/ui"
 )
 
 // DoctorCmd implements the doctor command.
@@ -40,65 +40,106 @@ func (cmd *DoctorCmd) Register(app *cli.Command) *cli.Command {
 }
 
 func (cmd *DoctorCmd) run(_ context.Context, _ *cli.Command) error {
-	cmd.checkTmuxInstalled()
-	cmd.checkTmuxSession()
-	cmd.checkGlobalConfig()
-	cmd.checkProjectConfig()
+	report := ui.NewReport("Solo Doctor", cmd.flags.NoColor)
 
+	report.AddSection(cmd.checkDependencies())
+	report.AddSection(cmd.checkEnvironment())
+	report.AddSection(cmd.checkConfiguration())
+
+	report.Render(cmd.out)
 	return nil
 }
 
-func (cmd *DoctorCmd) writef(format string, args ...any) {
-	_, _ = fmt.Fprintf(cmd.out, format, args...)
-}
+func (cmd *DoctorCmd) checkDependencies() ui.Section {
+	sec := ui.Section{Title: "Dependencies"}
 
-func (cmd *DoctorCmd) checkTmuxInstalled() {
 	path, err := exec.LookPath("tmux")
 	if err != nil {
-		cmd.writef("[warn] tmux not found in PATH\n")
-		return
+		sec.Checks = append(sec.Checks, ui.Check{
+			Status: ui.StatusWarn,
+			Label:  "tmux",
+			Detail: "not found in PATH",
+		})
+	} else {
+		sec.Checks = append(sec.Checks, ui.Check{
+			Status: ui.StatusPass,
+			Label:  "tmux",
+			Detail: path,
+		})
 	}
 
-	cmd.writef("[pass] tmux installed: %s\n", path)
+	return sec
 }
 
-func (cmd *DoctorCmd) checkTmuxSession() {
+func (cmd *DoctorCmd) checkEnvironment() ui.Section {
+	sec := ui.Section{Title: "Environment"}
+
 	if os.Getenv("TMUX") != "" {
-		cmd.writef("[pass] inside tmux session\n")
-		return
+		sec.Checks = append(sec.Checks, ui.Check{
+			Status: ui.StatusPass,
+			Label:  "tmux session",
+		})
+	} else {
+		sec.Checks = append(sec.Checks, ui.Check{
+			Status: ui.StatusInfo,
+			Label:  "tmux session",
+			Detail: "not inside a tmux session",
+		})
 	}
 
-	cmd.writef("[info] not inside tmux session\n")
+	return sec
 }
 
-func (cmd *DoctorCmd) checkGlobalConfig() {
+func (cmd *DoctorCmd) checkConfiguration() ui.Section {
+	sec := ui.Section{Title: "Configuration"}
+
+	// Global config
 	cfgPath := filepath.Join(paths.ConfigDir(), "config.yaml")
-
 	if _, err := os.Stat(cfgPath); os.IsNotExist(err) {
-		cmd.writef("[info] global config not found: %s\n", cfgPath)
-		return
+		sec.Checks = append(sec.Checks, ui.Check{
+			Status: ui.StatusInfo,
+			Label:  "global config",
+			Detail: "not found",
+		})
+	} else if _, err := config.ReadFrom(cfgPath); err != nil {
+		sec.Checks = append(sec.Checks, ui.Check{
+			Status: ui.StatusWarn,
+			Label:  "global config",
+			Detail: "parse error",
+		})
+	} else {
+		sec.Checks = append(sec.Checks, ui.Check{
+			Status: ui.StatusPass,
+			Label:  "global config",
+			Detail: cfgPath,
+		})
 	}
 
-	if _, err := config.ReadFrom(cfgPath); err != nil {
-		cmd.writef("[warn] global config parse error: %v\n", err)
-		return
-	}
-
-	cmd.writef("[pass] global config: %s\n", cfgPath)
-}
-
-func (cmd *DoctorCmd) checkProjectConfig() {
+	// Project config
 	cwd, err := os.Getwd()
 	if err != nil {
-		cmd.writef("[warn] cannot determine working directory: %v\n", err)
-		return
+		sec.Checks = append(sec.Checks, ui.Check{
+			Status: ui.StatusWarn,
+			Label:  "project config",
+			Detail: "cannot determine working directory",
+		})
+		return sec
 	}
 
 	result, err := config.ResolveProject(cwd, cmd.flags.Config)
 	if err != nil {
-		cmd.writef("[info] no project config found for current directory\n")
-		return
+		sec.Checks = append(sec.Checks, ui.Check{
+			Status: ui.StatusInfo,
+			Label:  "project config",
+			Detail: "no match for current directory",
+		})
+	} else {
+		sec.Checks = append(sec.Checks, ui.Check{
+			Status: ui.StatusPass,
+			Label:  "project config",
+			Detail: formatSource(result.Source),
+		})
 	}
 
-	cmd.writef("[pass] project config: %s\n", formatSource(result.Source))
+	return sec
 }

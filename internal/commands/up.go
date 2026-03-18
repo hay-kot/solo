@@ -53,11 +53,6 @@ func (cmd *UpCmd) run(ctx context.Context, _ *cli.Command) error {
 		return fmt.Errorf("resolving project: %w", err)
 	}
 
-	originalWindow, err := cmd.client.CurrentWindow(ctx)
-	if err != nil {
-		return fmt.Errorf("getting current window: %w", err)
-	}
-
 	existing, err := cmd.client.ListWindows(ctx)
 	if err != nil {
 		return fmt.Errorf("listing windows: %w", err)
@@ -94,10 +89,6 @@ func (cmd *UpCmd) run(ctx context.Context, _ *cli.Command) error {
 
 		spin.Stop(fmt.Sprintf("Created %s", tab.Title))
 		created++
-	}
-
-	if err := cmd.client.SelectWindow(ctx, originalWindow); err != nil {
-		return fmt.Errorf("selecting original window: %w", err)
 	}
 
 	_, _ = fmt.Fprintf(cmd.out, "Created %d/%d windows\n", created, len(result.Project.Tabs))

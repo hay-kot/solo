@@ -47,7 +47,7 @@ func (c *ExecClient) InTmux() bool {
 
 // NewWindow creates a new tmux window with the given name and returns its ID.
 func (c *ExecClient) NewWindow(ctx context.Context, name string) (string, error) {
-	cmd := exec.CommandContext(ctx, c.bin, "new-window", "-n", name, "-P", "-F", "#{window_id}")
+	cmd := exec.CommandContext(ctx, c.bin, "new-window", "-d", "-n", name, "-P", "-F", "#{window_id}")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("new-window %q: %s: %w", name, strings.TrimSpace(string(out)), err)
