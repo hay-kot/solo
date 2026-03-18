@@ -45,6 +45,7 @@ func (cmd *DoctorCmd) run(_ context.Context, _ *cli.Command) error {
 	report.AddSection(cmd.checkDependencies())
 	report.AddSection(cmd.checkEnvironment())
 	report.AddSection(cmd.checkConfiguration())
+	report.AddSection(cmd.checkPaths())
 
 	report.Render(cmd.out)
 	return nil
@@ -140,6 +141,29 @@ func (cmd *DoctorCmd) checkConfiguration() ui.Section {
 			Detail: formatSource(result.Source),
 		})
 	}
+
+	return sec
+}
+
+func (cmd *DoctorCmd) checkPaths() ui.Section {
+	sec := ui.Section{Title: "Paths"}
+
+	cfgPath := filepath.Join(paths.ConfigDir(), "config.yaml")
+	sec.Checks = append(sec.Checks, ui.Check{
+		Status: ui.StatusInfo,
+		Label:  "config",
+		Detail: cfgPath,
+	})
+
+	logFile := cmd.flags.LogFile
+	if logFile == "" {
+		logFile = filepath.Join(paths.DataDir(), "solo.log")
+	}
+	sec.Checks = append(sec.Checks, ui.Check{
+		Status: ui.StatusInfo,
+		Label:  "log file",
+		Detail: logFile,
+	})
 
 	return sec
 }
