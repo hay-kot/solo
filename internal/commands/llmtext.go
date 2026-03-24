@@ -112,8 +112,8 @@ func NewLLMTextCmd(flags *Flags) *LLMTextCmd {
 // Register adds the llmtext command to the application.
 func (cmd *LLMTextCmd) Register(app *cli.Command) *cli.Command {
 	app.Commands = append(app.Commands, &cli.Command{
-		Name:  "llmtext",
-		Usage: "Print an LLM-friendly description of solo and how to configure the current project",
+		Name:   "llmtext",
+		Usage:  "Print an LLM-friendly description of solo and how to configure the current project",
 		Action: cmd.run,
 	})
 
@@ -130,7 +130,10 @@ func (cmd *LLMTextCmd) run(_ context.Context, _ *cli.Command) error {
 
 	basename := filepath.Base(cwd)
 
-	fmt.Fprintf(cmd.out, llmTextTemplate, configPath, cwd, basename, basename)
+	_, err = fmt.Fprintf(cmd.out, llmTextTemplate, configPath, cwd, basename, basename)
+	if err != nil {
+		return fmt.Errorf("writing output: %w", err)
+	}
 
 	return nil
 }
