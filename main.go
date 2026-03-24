@@ -169,6 +169,7 @@ func run() int {
 	app = commands.NewConfigCmd(flags).Register(app)
 	app = commands.NewDoctorCmd(flags).Register(app)
 	// +scaffold:command:register
+	app = commands.NewLLMTextCmd(flags).Register(app)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
